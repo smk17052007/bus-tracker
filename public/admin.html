@@ -105,6 +105,35 @@ loadStops();
 var busMarkers = {};
 var stopMarkers = {};
 var routeLine = null;
+/* SMOOTH BUS MOVEMENT */
+
+function animateMarker(marker, newLatLng){
+
+const start = marker.getLatLng();
+
+const frames = 20;
+let frame = 0;
+
+const deltaLat = (newLatLng.lat - start.lat) / frames;
+const deltaLng = (newLatLng.lng - start.lng) / frames;
+
+const interval = setInterval(()=>{
+
+frame++;
+
+const lat = start.lat + deltaLat * frame;
+const lng = start.lng + deltaLng * frame;
+
+marker.setLatLng([lat,lng]);
+
+if(frame >= frames){
+clearInterval(interval);
+marker.setLatLng(newLatLng);
+}
+
+},50);
+
+}
 /* DISTANCE CALCULATION */
 
 function getDistance(lat1, lon1, lat2, lon2){
@@ -278,7 +307,8 @@ busMarkers[bus._id]=L.marker([bus.lat,bus.lng],{icon:busIcon})
 
 }else{
 
-busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
+//busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
+    animateMarker(busMarkers[bus._id], L.latLng(bus.lat,bus.lng));
 
 }
 
@@ -321,7 +351,8 @@ busMarkers[bus._id]=L.marker([bus.lat,bus.lng],{icon:busIcon})
 
 }else{
 
-busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
+    animateMarker(busMarkers[bus._id], L.latLng(bus.lat,bus.lng));
+//busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
 
 }
 /* UPDATE ETA FOR STOPS */
