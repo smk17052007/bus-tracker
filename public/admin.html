@@ -75,7 +75,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
 maxZoom:19
 }).addTo(map);
 
-/* Add stop when admin clicks map */
+/* CLICK MAP TO ADD STOP */
 
 map.on("click", function(e){
 
@@ -84,19 +84,15 @@ const stopName = prompt("Enter Stop Name:");
 if(!stopName) return;
 
 fetch("/add-stop",{
-
 method:"POST",
-
 headers:{
 "Content-Type":"application/json"
 },
-
 body:JSON.stringify({
 name:stopName,
 lat:e.latlng.lat,
 lng:e.latlng.lng
 })
-
 })
 .then(res=>res.json())
 .then(()=>{
@@ -108,17 +104,17 @@ loadStops();
 
 var busMarkers = {};
 var stopMarkers = {};
-/* ROUTE LINE */
-
 var routeLine = null;
+
 /* BUS ICON */
 
 var busIcon = L.icon({
-iconUrl: "/public/bus.png",
+iconUrl: "bus.png",
 iconSize: [36,36],
 iconAnchor: [18,18],
 popupAnchor: [0,-18]
 });
+
 /* DELETE ALL STOPS */
 
 function clearStops(){
@@ -146,20 +142,21 @@ const list=document.getElementById("stopList");
 
 list.innerHTML="";
 
-/* remove old markers */
+/* REMOVE OLD MARKERS */
 
 Object.values(stopMarkers).forEach(marker=>{
 map.removeLayer(marker);
 });
 
 stopMarkers={};
-var routeCoords = [];
+
+var routeCoords=[];
+
 stops.forEach(stop=>{
 
-routeCoords.push([stop.lat, stop.lng]);
+routeCoords.push([stop.lat,stop.lng]);
 
 const item=document.createElement("div");
-
 item.className="item";
 
 item.innerHTML=
@@ -168,7 +165,7 @@ stop.name+
 
 list.appendChild(item);
 
-/* show marker */
+/* STOP MARKER */
 
 const marker = L.marker([stop.lat,stop.lng])
 .addTo(map)
@@ -177,21 +174,25 @@ const marker = L.marker([stop.lat,stop.lng])
 stopMarkers[stop._id]=marker;
 
 });
-/* draw route */
+
+/* ROUTE LINE */
 
 if(routeLine){
 map.removeLayer(routeLine);
 }
 
-routeLine = L.polyline(routeCoords,{
+if(routeCoords.length>1){
+routeLine=L.polyline(routeCoords,{
 color:"blue",
 weight:4
 }).addTo(map);
+}
+
 });
 
 }
 
-/* DELETE SINGLE STOP */
+/* DELETE STOP */
 
 function deleteStop(id){
 
@@ -212,9 +213,9 @@ fetch("/buses")
 .then(res=>res.json())
 .then(buses=>{
 
-document.getElementById("busCount").innerText = buses.length;
+document.getElementById("busCount").innerText=buses.length;
 
-let onlineCount = 0;
+let onlineCount=0;
 
 const list=document.getElementById("busList");
 
@@ -223,34 +224,33 @@ list.innerHTML="";
 buses.forEach(bus=>{
 
 const item=document.createElement("div");
-
 item.className="item";
 
-/* check bus status */
+/* ONLINE STATUS */
 
-const lastUpdate = new Date(bus.lastUpdated);
-const now = new Date();
+const lastUpdate=new Date(bus.lastUpdated);
+const now=new Date();
 
-const diff = (now - lastUpdate) / 1000;
+const diff=(now-lastUpdate)/1000;
 
-let status = "🔴 Offline";
+let status="🔴 Offline";
 
-if(diff < 30){
-status = "🟢 Online";
+if(diff<30){
+status="🟢 Online";
 onlineCount++;
 }
 
-item.innerHTML =
-bus.busName + " " + status +
+item.innerHTML=
+bus.busName+" "+status+
 " <button onclick='deleteBus(\""+bus._id+"\")'>Delete</button>";
 
 list.appendChild(item);
 
-/* show bus on map */
+/* BUS MARKER */
 
 if(!busMarkers[bus._id]){
 
-busMarkers[bus._id] = L.marker([bus.lat,bus.lng],{icon:busIcon})//L.marker([bus.lat,bus.lng])
+busMarkers[bus._id]=L.marker([bus.lat,bus.lng],{icon:busIcon})
 .addTo(map)
 .bindPopup(bus.busName);
 
@@ -262,7 +262,7 @@ busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
 
 });
 
-document.getElementById("onlineBusCount").innerText = onlineCount;
+document.getElementById("onlineBusCount").innerText=onlineCount;
 
 });
 
@@ -293,7 +293,7 @@ buses.forEach(bus=>{
 
 if(!busMarkers[bus._id]){
 
-busMarkers[bus._id] = L.marker([bus.lat,bus.lng],{icon:busIcon})//L.marker([bus.lat,bus.lng])
+busMarkers[bus._id]=L.marker([bus.lat,bus.lng],{icon:busIcon})
 .addTo(map)
 .bindPopup(bus.busName);
 
