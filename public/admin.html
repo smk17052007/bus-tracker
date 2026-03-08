@@ -5,7 +5,6 @@
 <title>Bus Tracker Admin</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
@@ -30,6 +29,13 @@ margin-top:20px;
 margin-bottom:6px;
 }
 
+#dashboard{
+background:#f4f4f4;
+padding:10px;
+border-radius:8px;
+margin-bottom:20px;
+}
+
 </style>
 
 </head>
@@ -37,6 +43,16 @@ margin-bottom:6px;
 <body>
 
 <h2>Bus Tracker Admin Panel</h2>
+
+<h3>Dashboard</h3>
+
+<div id="dashboard">
+
+<p>Total Stops: <span id="stopCount">0</span></p>
+<p>Total Buses: <span id="busCount">0</span></p>
+<p>Online Buses: <span id="onlineBusCount">0</span></p>
+
+</div>
 
 <button onclick="clearStops()">Delete All Stops</button>
 <button onclick="reloadStops()">Reload Stops</button>
@@ -58,6 +74,7 @@ var map = L.map('map').setView([16.7333,82.2167],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
 maxZoom:19
 }).addTo(map);
+
 /* Add stop when admin clicks map */
 
 map.on("click", function(e){
@@ -88,9 +105,17 @@ loadStops();
 });
 
 });
-var busMarkers = {};
 
+var busMarkers = {};
 var stopMarkers = {};
+/* BUS ICON */
+
+var busIcon = L.icon({
+iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61231.png",
+iconSize: [32,32],
+iconAnchor: [16,16],
+popupAnchor: [0,-15]
+});
 /* DELETE ALL STOPS */
 
 function clearStops(){
@@ -104,7 +129,6 @@ loadStops();
 
 }
 
-
 /* LOAD STOPS */
 
 function loadStops(){
@@ -112,6 +136,8 @@ function loadStops(){
 fetch("/stops")
 .then(res=>res.json())
 .then(stops=>{
+
+document.getElementById("stopCount").innerText = stops.length;
 
 const list=document.getElementById("stopList");
 
@@ -150,6 +176,7 @@ stopMarkers[stop._id]=marker;
 });
 
 }
+
 /* DELETE SINGLE STOP */
 
 function deleteStop(id){
@@ -163,14 +190,17 @@ loadStops();
 
 }
 
-
 /* LOAD BUSES */
- 
+
 function loadBuses(){
 
 fetch("/buses")
 .then(res=>res.json())
 .then(buses=>{
+
+document.getElementById("busCount").innerText = buses.length;
+
+let onlineCount = 0;
 
 const list=document.getElementById("busList");
 
@@ -191,8 +221,9 @@ const diff = (now - lastUpdate) / 1000;
 
 let status = "🔴 Offline";
 
-if(diff < 15){
+if(diff < 30){
 status = "🟢 Online";
+onlineCount++;
 }
 
 item.innerHTML =
@@ -205,7 +236,7 @@ list.appendChild(item);
 
 if(!busMarkers[bus._id]){
 
-busMarkers[bus._id] = L.marker([bus.lat,bus.lng])
+busMarkers[bus._id] = L.marker([bus.lat,bus.lng],{icon:busIcon})//L.marker([bus.lat,bus.lng])
 .addTo(map)
 .bindPopup(bus.busName);
 
@@ -216,6 +247,8 @@ busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
 }
 
 });
+
+document.getElementById("onlineBusCount").innerText = onlineCount;
 
 });
 
@@ -234,7 +267,6 @@ loadBuses();
 
 }
 
-
 /* LIVE BUS MOVEMENT */
 
 function loadLiveBuses(){
@@ -247,7 +279,7 @@ buses.forEach(bus=>{
 
 if(!busMarkers[bus._id]){
 
-busMarkers[bus._id] = L.marker([bus.lat,bus.lng])
+busMarkers[bus._id] = L.marker([bus.lat,bus.lng],{icon:busIcon})//L.marker([bus.lat,bus.lng])
 .addTo(map)
 .bindPopup(bus.busName);
 
@@ -263,8 +295,6 @@ busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
 
 }
 
-
-
 /* RELOAD */
 
 function reloadStops(){
@@ -274,9 +304,7 @@ loadBuses();
 
 }
 
-
 /* LOAD ON START */
-
 
 window.onload=()=>{
 
