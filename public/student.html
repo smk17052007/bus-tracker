@@ -86,7 +86,10 @@ console.log("Socket disconnected");
 
 let stopsData = [];
 let busMarkers = {};
-
+const busIcon = L.icon({
+iconUrl: "/images/bus.png",
+iconSize: [40,40]
+});
 fetch("/stops")
 .then(res=>res.json())
 .then(stops=>{
@@ -141,10 +144,15 @@ const busName = location.busName;
 
 if(!busMarkers[busName]){
 
-busMarkers[busName] = L.marker([location.lat, location.lng])
+/*busMarkers[busName] = L.marker([location.lat, location.lng])
+.addTo(map)
+.bindPopup(busName);*/ 
+busMarkers[busName] = L.marker(
+[location.lat, location.lng],
+{ icon: busIcon }
+)
 .addTo(map)
 .bindPopup(busName);
-
 }
 
 busMarkers[busName].setLatLng([location.lat, location.lng]);
