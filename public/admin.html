@@ -58,7 +58,36 @@ var map = L.map('map').setView([16.7333,82.2167],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
 maxZoom:19
 }).addTo(map);
+/* Add stop when admin clicks map */
 
+map.on("click", function(e){
+
+const stopName = prompt("Enter Stop Name:");
+
+if(!stopName) return;
+
+fetch("/add-stop",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+name:stopName,
+lat:e.latlng.lat,
+lng:e.latlng.lng
+})
+
+})
+.then(res=>res.json())
+.then(()=>{
+alert("Stop added");
+loadStops();
+});
+
+});
 var busMarkers = {};
 
 var stopMarkers = {};
