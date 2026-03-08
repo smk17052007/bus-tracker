@@ -54,18 +54,26 @@ alert("Enter Bus Name");
 return;
 }
 
-tracking = true;
+document.getElementById("status").innerText="Requesting GPS permission...";
 
-document.getElementById("status").innerText="Tracking started...";
+/* FIRST GPS REQUEST (triggers permission popup) */
+
+navigator.geolocation.getCurrentPosition(
+
+pos=>{
+
+document.getElementById("status").innerText="Tracking started";
+
+/* START CONTINUOUS TRACKING */
 
 setInterval(()=>{
 
-if(!tracking) return;
+navigator.geolocation.getCurrentPosition(
 
-navigator.geolocation.getCurrentPosition(pos=>{
+position=>{
 
-const lat = pos.coords.latitude;
-const lng = pos.coords.longitude;
+const lat = position.coords.latitude;
+const lng = position.coords.longitude;
 
 fetch("/update-location",{
 
@@ -83,14 +91,35 @@ lng:lng
 
 });
 
-document.getElementById("status").innerText=
+document.getElementById("status").innerText =
 "Sending location: "+lat.toFixed(5)+", "+lng.toFixed(5);
 
-});
+},
+
+error=>{
+
+document.getElementById("status").innerText =
+"GPS Error: "+error.message;
+
+}
+
+);
 
 },2000);
 
+},
+
+err=>{
+
+document.getElementById("status").innerText =
+"GPS permission denied or unavailable";
+
 }
+
+);
+
+}
+ 
 
 </script>
 
