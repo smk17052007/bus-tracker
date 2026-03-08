@@ -91,7 +91,18 @@ align-items:center;
 .section{
 margin-top:20px;
 }
+.logoutBtn{
+position:absolute;
+right:20px;
+top:12px;
+background:#f44336;
+padding:6px 12px;
+border-radius:6px;
+}
 
+.logoutBtn:hover{
+background:#d32f2f;
+}
 </style>
 
 </head>
@@ -100,6 +111,7 @@ margin-top:20px;
 
 <div class="header">
 🚌 Bus Tracker Admin Dashboard
+<button onclick="logout()" class="logoutBtn">Logout</button>
 </div>
 
 <div class="container">
@@ -477,6 +489,15 @@ function reloadStops(){
 
 loadStops();
 loadBuses();
+
+}
+function logout(){
+
+localStorage.removeItem("admin");
+
+alert("Logged out");
+
+window.location = "admin-login.html";
 
 }
 
