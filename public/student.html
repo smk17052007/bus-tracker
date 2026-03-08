@@ -53,6 +53,8 @@ max-height:120px;
 overflow:auto;
 font-size:14px;
 border-bottom:1px solid #ddd;
+margin-top:10px;
+line-height:1.8;
 }
 
 /* MAP AREA */
@@ -68,7 +70,7 @@ background:white;
 padding:15px;
 border-top-left-radius:20px;
 border-top-right-radius:20px;
-box-shadow:0 -3px 10px rgba(0,0,0,0.3);
+box-shadow:0 -4px 10px rgba(0,0,0,0.2);
 }
 
 /* TEXT */
@@ -193,7 +195,7 @@ let stopMarkers = [];
 let busMarkers = {};
 let lastPositions = {};
 let lastMoveTime = {};
-
+let busRoutes = {};
 /* -----------------------
 LOAD STOPS
 ----------------------- */
@@ -368,7 +370,16 @@ return;
 
 const lat = Number(location.lat);
 const lng = Number(location.lng);
+if(!busRoutes[busName]){
 
+busRoutes[busName] = L.polyline([],{
+color:"blue",
+weight:4
+}).addTo(map);
+
+}
+
+busRoutes[busName].addLatLng([lat,lng]);
 let rotation = 0;
 
 if(lastPositions[busName]){
