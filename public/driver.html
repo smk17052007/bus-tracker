@@ -33,8 +33,13 @@ font-size:18px;
 
 <p>Enter Bus Name</p>
 
-<input id="busName" placeholder="Bus1">
 
+<select id="busName">
+<option value="">Select Bus</option>
+<option value="Bus1">Bus1</option>
+<option value="Bus2">Bus2</option>
+<option value="Bus3">Bus3</option>
+</select>
 <br><br>
 
 <button onclick="startTracking()">Start Tracking</button>
@@ -50,7 +55,7 @@ function startTracking(){
 const busName = document.getElementById("busName").value;
 
 if(!busName){
-alert("Enter Bus Name");
+alert("select Bus");
 return;
 }
 
