@@ -107,16 +107,24 @@ res.send({ message: "Stop added successfully" });
    Clear Stops
 --------------------------------*/
 
-app.post("/clear-stops",(req,res)=>{
 
-fs.writeFileSync("stops.json","[]");
+app.post("/clear-stops", async (req,res)=>{
+
+try{
+
+await Stop.deleteMany({});
 
 res.json({
-message:"Stops cleared"
+message:"All stops deleted"
 });
 
-});
+}catch(err){
 
+res.status(500).json({error:err});
+
+}
+
+});
 /* -------------------------------
    Send Stops to Map
 --------------------------------*/
@@ -128,7 +136,35 @@ const stops = await Stop.find();
 res.json(stops);
 
 });
+app.delete("/delete-stop/:id", async (req, res) => {
 
+  try {
+    await Stop.findByIdAndDelete(req.params.id);
+    res.send("Stop deleted");
+  } catch (err) {
+    res.status(500).send(err);
+  }
+
+});
+
+
+app.get("/buses", async (req,res)=>{
+
+const buses = await Bus.find();
+
+res.json(buses);
+
+});
+app.delete("/delete-bus/:id", async (req, res) => {
+
+  try {
+    await Bus.findByIdAndDelete(req.params.id);
+    res.send("Bus deleted");
+  } catch (err) {
+    res.status(500).send(err);
+  }
+
+});
 /* -------------------------------
    Socket.IO Connection
 --------------------------------*/

@@ -2,7 +2,11 @@
 <html>
 <head>
 
-<title>Bus Admin Panel</title>
+<title>Bus Tracker Admin</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
 
@@ -12,9 +16,18 @@ padding:20px;
 }
 
 button{
-padding:10px 20px;
-margin:10px;
-font-size:16px;
+padding:6px 14px;
+margin:6px;
+font-size:14px;
+}
+
+#map{
+height:400px;
+margin-top:20px;
+}
+
+.item{
+margin-bottom:6px;
 }
 
 </style>
@@ -23,33 +36,197 @@ font-size:16px;
 
 <body>
 
-<h2>Bus Tracker Admin</h2>
+<h2>Bus Tracker Admin Panel</h2>
 
-<button onclick="clearStops()">
-Delete All Stops
-</button>
+<button onclick="clearStops()">Delete All Stops</button>
+<button onclick="reloadStops()">Reload Stops</button>
 
-<button onclick="reloadStops()">
-Reload Stops
-</button>
+<h3>Stops</h3>
+<div id="stopList"></div>
+
+<h3>Buses</h3>
+<div id="busList"></div>
+
+<div id="map"></div>
 
 <script>
 
+/* MAP */
+
+var map = L.map('map').setView([16.7333,82.2167],13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19
+}).addTo(map);
+
+var busMarkers = {};
+
+var stopMarkers = {};
+/* DELETE ALL STOPS */
+
 function clearStops(){
 
-fetch("/clear-stops",{
-method:"POST"
-})
+fetch("/clear-stops",{method:"POST"})
 .then(res=>res.json())
-.then(data=>{
-alert("Stops deleted");
+.then(()=>{
+alert("All stops deleted");
+loadStops();
 });
 
 }
 
+
+/* LOAD STOPS */
+
+function loadStops(){
+
+fetch("/stops")
+.then(res=>res.json())
+.then(stops=>{
+
+const list=document.getElementById("stopList");
+
+list.innerHTML="";
+
+/* remove old markers */
+
+Object.values(stopMarkers).forEach(marker=>{
+map.removeLayer(marker);
+});
+
+stopMarkers={};
+
+stops.forEach(stop=>{
+
+const item=document.createElement("div");
+
+item.className="item";
+
+item.innerHTML=
+stop.name+
+" <button onclick='deleteStop(\""+stop._id+"\")'>Delete</button>";
+
+list.appendChild(item);
+
+/* show marker */
+
+const marker = L.marker([stop.lat,stop.lng])
+.addTo(map)
+.bindPopup(stop.name);
+
+stopMarkers[stop._id]=marker;
+
+});
+
+});
+
+}
+/* DELETE SINGLE STOP */
+
+function deleteStop(id){
+
+fetch("/delete-stop/"+id,{method:"DELETE"})
+.then(res=>res.text())
+.then(msg=>{
+alert(msg);
+loadStops();
+});
+
+}
+
+
+/* LOAD BUSES */
+
+function loadBuses(){
+
+fetch("/buses")
+.then(res=>res.json())
+.then(buses=>{
+
+const list=document.getElementById("busList");
+
+list.innerHTML="";
+
+buses.forEach(bus=>{
+
+const item=document.createElement("div");
+
+item.className="item";
+
+item.innerHTML=
+bus.busName+
+" <button onclick='deleteBus(\""+bus._id+"\")'>Delete</button>";
+
+list.appendChild(item);
+
+});
+
+});
+
+}
+
+
+/* DELETE BUS */
+
+function deleteBus(id){
+
+fetch("/delete-bus/"+id,{method:"DELETE"})
+.then(res=>res.text())
+.then(msg=>{
+alert(msg);
+loadBuses();
+});
+
+}
+
+
+/* LIVE BUS MOVEMENT */
+
+function loadLiveBuses(){
+
+fetch("/bus-locations")
+.then(res=>res.json())
+.then(buses=>{
+
+buses.forEach(bus=>{
+
+if(!busMarkers[bus._id]){
+
+busMarkers[bus._id]=L.marker([bus.lat,bus.lng])
+.addTo(map)
+.bindPopup(bus.name);
+
+}else{
+
+busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
+
+}
+
+});
+
+});
+
+}
+
+
+/* RELOAD */
+
 function reloadStops(){
 
-location.reload();
+loadStops();
+loadBuses();
+
+}
+
+
+/* LOAD ON START */
+
+window.onload=()=>{
+
+loadStops();
+loadBuses();
+
+setInterval(loadLiveBuses,2000);
 
 }
 
