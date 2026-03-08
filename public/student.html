@@ -16,32 +16,99 @@ href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
 body{
 margin:0;
 font-family:Arial;
+background:#f4f6f8;
 }
+
+/* HEADER */
+
+#header{
+background:#2196f3;
+color:white;
+padding:12px;
+font-size:20px;
+text-align:center;
+font-weight:bold;
+}
+
+/* BUS CONTROL BAR */
+
+#controls{
+background:white;
+padding:10px;
+display:flex;
+align-items:center;
+gap:10px;
+box-shadow:0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* MAP */
 
 #map{
-height:100vh;
+height:60vh;
 }
+
+/* STOP LIST */
+
+#stopList{
+background:white;
+padding:10px;
+max-height:120px;
+overflow:auto;
+font-size:14px;
+border-bottom:1px solid #ddd;
+}
+
+/* PANEL */
 
 #panel{
-
-position:absolute;
-bottom:0;
-left:0;
-right:0;
-
 background:white;
-
 padding:15px;
-
 border-top-left-radius:20px;
 border-top-right-radius:20px;
-
 box-shadow:0 -3px 10px rgba(0,0,0,0.3);
 }
+
+/* TEXT */
 
 .bigText{
 font-size:22px;
 font-weight:bold;
+}
+
+.infoRow{
+margin-top:5px;
+font-size:18px;
+}
+
+/* LOCATE BUTTON */
+
+#locateBtn{
+
+position:absolute;
+
+right:15px;
+bottom:180px;
+
+background:#2196f3;
+color:white;
+
+width:45px;
+height:45px;
+
+display:flex;
+align-items:center;
+justify-content:center;
+
+font-size:22px;
+
+border-radius:50%;
+
+cursor:pointer;
+
+box-shadow:0 3px 8px rgba(0,0,0,0.3);
+
+z-index:1000;
+
 }
 
 </style>
@@ -50,23 +117,38 @@ font-weight:bold;
 
 <body>
 
-<div id="map"></div>
+<div id="header">
+🚌 College Bus Tracker
+</div>
 
-<div id="panel">
+<div id="controls">
 
-<div>
-Select Bus:
+<label>Select Bus:</label>
+
 <select id="busSelect">
 <option value="ALL">All Buses</option>
 </select>
+
 </div>
+
+<div id="stopList"></div>
+
+<div id="map"></div>
+
+<div id="locateBtn">📍</div>
+
+<div id="panel">
 
 <div class="bigText">
 Next Stop: <span id="nextStop">--</span>
 </div>
 
-<div>
+<div class="infoRow">
 ETA: <span id="eta">--</span>
+</div>
+
+<div class="infoRow">
+Status: <span id="status">Waiting...</span>
 </div>
 
 </div>
@@ -108,6 +190,7 @@ let stopsData = [];
 let stopMarkers = [];
 let busMarkers = {};
 let lastPositions = {};
+let lastMoveTime = {};
 
 /* -----------------------
 LOAD STOPS
@@ -118,6 +201,8 @@ fetch("/stops")
 .then(stops=>{
 
 stopsData = stops;
+
+const list=document.getElementById("stopList");
 
 stops.forEach((stop,index)=>{
 
@@ -133,6 +218,16 @@ fillOpacity:1
 .bindPopup(stop.name);
 
 stopMarkers.push(marker);
+
+/* ADD TO STOP LIST */
+
+const item=document.createElement("div");
+
+item.innerText=(index+1)+". "+stop.name;
+
+item.style.padding="4px";
+
+list.appendChild(item);
 
 });
 
@@ -186,7 +281,7 @@ return closest;
 }
 
 /* -----------------------
-BUS DIRECTION CALCULATION
+BUS DIRECTION
 ----------------------- */
 
 function getBearing(lat1,lng1,lat2,lng2){
@@ -210,7 +305,7 @@ return (brng + 360) % 360;
 }
 
 /* -----------------------
-SMOOTH BUS MOVEMENT
+SMOOTH MOVEMENT
 ----------------------- */
 
 function animateMarker(marker,newLat,newLng){
@@ -249,11 +344,7 @@ BUS MOVEMENT EVENT
 
 socket.on("bus-moved",(location)=>{
 
-console.log("Bus moved:", location);
-
 const busName = location.busName;
-
-/* ADD BUS TO DROPDOWN */
 
 const select = document.getElementById("busSelect");
 
@@ -266,8 +357,6 @@ option.text = busName;
 select.appendChild(option);
 
 }
-
-/* CHECK SELECTED BUS */
 
 const selectedBus = select.value;
 
@@ -295,6 +384,8 @@ lng
 
 lastPositions[busName] = {lat,lng};
 
+lastMoveTime[busName]=Date.now();
+
 /* BUS ICON */
 
 const busIcon = L.divIcon({
@@ -304,7 +395,7 @@ iconSize:[40,40],
 className:""
 });
 
-/* CREATE OR UPDATE MARKER */
+/* CREATE OR UPDATE */
 
 if(!busMarkers[busName]){
 
@@ -320,15 +411,11 @@ busMarkers[busName].setIcon(busIcon);
 
 }
 
-/* SMOOTH MOVEMENT */
-
-animateMarker(
-busMarkers[busName],
-lat,
-lng
-);
+animateMarker(busMarkers[busName],lat,lng);
 
 map.panTo([lat,lng]);
+
+document.getElementById("status").innerText="Moving 🟢";
 
 /* NEXT STOP */
 
@@ -339,8 +426,6 @@ if(nextStop){
 let nextIndex = stopsData.findIndex(
 s => s.name === nextStop.name
 );
-
-/* STOP COLOR UPDATE */
 
 stopMarkers.forEach((marker,index)=>{
 
@@ -361,8 +446,6 @@ marker.setStyle({color:"blue",fillColor:"blue"});
 }
 
 });
-
-/* ETA */
 
 document.getElementById("nextStop").innerText = nextStop.name;
 
@@ -385,9 +468,45 @@ document.getElementById("eta").innerText = eta+" min";
 
 });
 
-/* -----------------------
-SERVICE WORKER
------------------------ */
+/* BUS WAITING DETECTOR */
+
+setInterval(()=>{
+
+const select=document.getElementById("busSelect");
+const bus=select.value;
+
+if(bus==="ALL") return;
+
+if(!lastMoveTime[bus]) return;
+
+const diff=(Date.now()-lastMoveTime[bus])/1000;
+
+if(diff>10){
+
+document.getElementById("status").innerText="Waiting 🔴";
+
+}
+
+},3000);
+
+/* LOCATE BUTTON */
+
+document.getElementById("locateBtn").onclick=function(){
+
+const select=document.getElementById("busSelect");
+
+const bus=select.value;
+
+if(bus==="ALL" || !busMarkers[bus]){
+alert("Select a bus first");
+return;
+}
+
+map.panTo(busMarkers[bus].getLatLng());
+
+};
+
+/* SERVICE WORKER */
 
 if("serviceWorker" in navigator){
 
