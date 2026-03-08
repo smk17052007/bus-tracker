@@ -165,7 +165,7 @@ loadStops();
 
 
 /* LOAD BUSES */
-
+ 
 function loadBuses(){
 
 fetch("/buses")
@@ -182,18 +182,44 @@ const item=document.createElement("div");
 
 item.className="item";
 
-item.innerHTML=
-bus.busName+
+/* check bus status */
+
+const lastUpdate = new Date(bus.lastUpdated);
+const now = new Date();
+
+const diff = (now - lastUpdate) / 1000;
+
+let status = "🔴 Offline";
+
+if(diff < 15){
+status = "🟢 Online";
+}
+
+item.innerHTML =
+bus.busName + " " + status +
 " <button onclick='deleteBus(\""+bus._id+"\")'>Delete</button>";
 
 list.appendChild(item);
+
+/* show bus on map */
+
+if(!busMarkers[bus._id]){
+
+busMarkers[bus._id] = L.marker([bus.lat,bus.lng])
+.addTo(map)
+.bindPopup(bus.busName);
+
+}else{
+
+busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
+
+}
 
 });
 
 });
 
 }
-
 
 /* DELETE BUS */
 
@@ -213,7 +239,7 @@ loadBuses();
 
 function loadLiveBuses(){
 
-fetch("/bus-locations")
+fetch("/buses")
 .then(res=>res.json())
 .then(buses=>{
 
@@ -221,9 +247,9 @@ buses.forEach(bus=>{
 
 if(!busMarkers[bus._id]){
 
-busMarkers[bus._id]=L.marker([bus.lat,bus.lng])
+busMarkers[bus._id] = L.marker([bus.lat,bus.lng])
 .addTo(map)
-.bindPopup(bus.name);
+.bindPopup(bus.busName);
 
 }else{
 
@@ -238,6 +264,7 @@ busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
 }
 
 
+
 /* RELOAD */
 
 function reloadStops(){
@@ -250,12 +277,14 @@ loadBuses();
 
 /* LOAD ON START */
 
+
 window.onload=()=>{
 
 loadStops();
 loadBuses();
 
 setInterval(loadLiveBuses,2000);
+setInterval(loadBuses,5000);
 
 }
 
