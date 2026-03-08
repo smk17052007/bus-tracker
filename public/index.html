@@ -40,6 +40,7 @@ ETA: <span id="eta">--</span>
 <script>
 
 let stopsData = [];
+let lastPositions = {};
 
 /* -----------------------------
    Map Initialization
@@ -48,47 +49,10 @@ let stopsData = [];
 const map = L.map('map').setView([16.5062,80.6480],14);
 
 /* -----------------------------
-   Admin Mode (Add Stops)
+   Passenger Mode
 ------------------------------*/
 
-const isAdmin = true;
-
-if(isAdmin){
-
-map.on("click",function(e){
-
-const name = prompt("Enter Stop Name:");
-if(!name) return;
-
-const lat = e.latlng.lat;
-const lng = e.latlng.lng;
-
-fetch("/add-stop",{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-name:name,
-lat:lat,
-lng:lng
-})
-})
-.then(res=>res.json())
-.then(data=>{
-
-alert("Stop added successfully!");
-
-L.marker([lat,lng])
-.addTo(map)
-.bindPopup(name)
-.openPopup();
-
-});
-
-});
-
-}
+const isAdmin = false;
 
 /* -----------------------------
    Map Tiles
@@ -115,7 +79,7 @@ console.log("Socket connected:", socket.id);
 
 const markers = {};
 
-function animateMarker(marker, newLat, newLng){
+function animateMarker(marker,newLat,newLng){
 
 const start = marker.getLatLng();
 
@@ -177,14 +141,26 @@ weight:4
 });
 
 /* -----------------------------
-   Distance Function
+   Distance (Haversine)
 ------------------------------*/
 
-function distance(lat1,lng1,lat2,lng2){
-return Math.sqrt(
-Math.pow(lat1-lat2,2)+
-Math.pow(lng1-lng2,2)
-);
+function distance(lat1,lon1,lat2,lon2){
+
+const R = 6371;
+
+const dLat = (lat2-lat1) * Math.PI/180;
+const dLon = (lon2-lon1) * Math.PI/180;
+
+const a =
+Math.sin(dLat/2)*Math.sin(dLat/2)+
+Math.cos(lat1*Math.PI/180)*
+Math.cos(lat2*Math.PI/180)*
+Math.sin(dLon/2)*Math.sin(dLon/2);
+
+const c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+return R*c;
+
 }
 
 /* -----------------------------
@@ -212,27 +188,71 @@ return closestStop;
 }
 
 /* -----------------------------
+   Calculate Direction
+------------------------------*/
+
+function getBearing(lat1,lng1,lat2,lng2){
+
+const dLon = (lng2-lng1) * Math.PI/180;
+
+lat1 = lat1 * Math.PI/180;
+lat2 = lat2 * Math.PI/180;
+
+const y = Math.sin(dLon) * Math.cos(lat2);
+const x =
+Math.cos(lat1)*Math.sin(lat2)-
+Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+
+let brng = Math.atan2(y,x);
+
+brng = brng * 180/Math.PI;
+
+return (brng + 360) % 360;
+
+}
+
+/* -----------------------------
    Bus Movement Listener
 ------------------------------*/
 
 socket.on("bus-moved",(location)=>{
 
-console.log("Bus moved:", location);
-
 const lat = Number(location.lat);
 const lng = Number(location.lng);
 
-if(!markers[location.busName]){
+let rotation = 0;
 
-const busIcon = L.icon({
-iconUrl:"https://cdn-icons-png.flaticon.com/512/61/61231.png",
-iconSize:[40,40]
+if(lastPositions[location.busName]){
+
+const last = lastPositions[location.busName];
+
+rotation = getBearing(
+last.lat,
+last.lng,
+lat,
+lng
+);
+
+}
+
+lastPositions[location.busName] = {lat,lng};
+
+const busIcon = L.divIcon({
+html:`<img src="bus.png"
+style="width:40px;transform:rotate(${rotation}deg);">`,
+iconSize:[40,40],
+className:""
 });
 
-markers[location.busName] = L.marker(
-[lat,lng],
-{icon:busIcon}
-).addTo(map);
+if(!markers[location.busName]){
+
+markers[location.busName] =
+L.marker([lat,lng],{icon:busIcon})
+.addTo(map);
+
+}else{
+
+markers[location.busName].setIcon(busIcon);
 
 }
 
@@ -243,6 +263,8 @@ lng
 );
 
 map.panTo([lat,lng]);
+
+/* ETA Calculation */
 
 const nextStop = getNextStop(lat,lng);
 
@@ -257,7 +279,11 @@ nextStop.lat,
 nextStop.lng
 );
 
-const etaMinutes = Math.round(dist*500);
+const speed = 30;
+
+let etaMinutes = Math.round((dist/speed)*60);
+
+if(etaMinutes < 1) etaMinutes = 1;
 
 document.getElementById("eta").innerText = etaMinutes+" min";
 
