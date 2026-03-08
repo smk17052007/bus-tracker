@@ -187,11 +187,12 @@ list.appendChild(item);
 
 /* STOP MARKER */
 
+
 const marker = L.marker([stop.lat,stop.lng])
 .addTo(map)
 .bindPopup(stop.name + "<br>🚌 Calculating ETA...");
-//.bindPopup(stop.name);
 
+marker.stopName = stop.name;
 stopMarkers[stop._id]=marker;
 
 });
@@ -324,14 +325,11 @@ busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
 
 }
 /* UPDATE ETA FOR STOPS */
-
 Object.keys(stopMarkers).forEach(id=>{
 
 const stopMarker = stopMarkers[id];
 
 const stopLatLng = stopMarker.getLatLng();
-
-/* calculate distance */
 
 const distance = getDistance(
 bus.lat,
@@ -346,22 +344,16 @@ const speed = 30;
 
 let eta = Math.round((distance/speed)*60);
 
-/* limit ETA */
-
 if(eta < 1) eta = 1;
 if(eta > 60) eta = ">60";
 
-/* get stop name */
-
-const stopName = stopMarker.getPopup().getContent().split("<br>")[0];
-
-/* update popup */
-
 stopMarker.setPopupContent(
-stopName + "<br>🚌 Bus arriving in " + eta + " min"
+stopMarker.stopName + "<br>🚌 Bus arriving in " + eta + " min"
 );
 
 });
+ 
+
 });
 
 });
