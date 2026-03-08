@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#2196f3">
+
 <title>College Bus Tracker</title>
 
 <link rel="stylesheet"
@@ -53,6 +54,13 @@ font-weight:bold;
 
 <div id="panel">
 
+<div>
+Select Bus:
+<select id="busSelect">
+<option value="ALL">All Buses</option>
+</select>
+</div>
+
 <div class="bigText">
 Next Stop: <span id="nextStop">--</span>
 </div>
@@ -68,11 +76,19 @@ ETA: <span id="eta">--</span>
 
 <script>
 
+/* -----------------------
+MAP INITIALIZATION
+----------------------- */
+
 const map = L.map("map").setView([16.5062,80.6480],14);
 
 L.tileLayer(
 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 ).addTo(map);
+
+/* -----------------------
+SOCKET CONNECTION
+----------------------- */
 
 const socket = io();
 
@@ -84,34 +100,70 @@ socket.on("disconnect", () => {
 console.log("Socket disconnected");
 });
 
+/* -----------------------
+DATA STORAGE
+----------------------- */
+
 let stopsData = [];
+let stopMarkers = [];
 let busMarkers = {};
-const busIcon = L.icon({
-iconUrl: "/images/bus.png",
-iconSize: [40,40]
-});
+let lastPositions = {};
+
+/* -----------------------
+LOAD STOPS
+----------------------- */
+
 fetch("/stops")
 .then(res=>res.json())
 .then(stops=>{
 
 stopsData = stops;
 
-stops.forEach(stop=>{
-L.marker([stop.lat,stop.lng])
+stops.forEach((stop,index)=>{
+
+const marker = L.circleMarker(
+[stop.lat,stop.lng],
+{
+radius:8,
+color:"blue",
+fillColor:"blue",
+fillOpacity:1
+})
 .addTo(map)
 .bindPopup(stop.name);
-});
+
+stopMarkers.push(marker);
 
 });
 
-function distance(lat1,lng1,lat2,lng2){
+});
 
-return Math.sqrt(
-Math.pow(lat1-lat2,2)+
-Math.pow(lng1-lng2,2)
-);
+/* -----------------------
+HAVERSINE DISTANCE
+----------------------- */
+
+function distance(lat1,lon1,lat2,lon2){
+
+const R = 6371;
+
+const dLat = (lat2-lat1) * Math.PI/180;
+const dLon = (lon2-lon1) * Math.PI/180;
+
+const a =
+Math.sin(dLat/2)*Math.sin(dLat/2)+
+Math.cos(lat1*Math.PI/180)*
+Math.cos(lat2*Math.PI/180)*
+Math.sin(dLon/2)*Math.sin(dLon/2);
+
+const c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+return R*c;
 
 }
+
+/* -----------------------
+NEXT STOP DETECTION
+----------------------- */
 
 function getNextStop(busLat,busLng){
 
@@ -133,52 +185,209 @@ return closest;
 
 }
 
-/* IMPORTANT: event name must match server */
+/* -----------------------
+BUS DIRECTION CALCULATION
+----------------------- */
+
+function getBearing(lat1,lng1,lat2,lng2){
+
+const dLon = (lng2-lng1) * Math.PI/180;
+
+lat1 = lat1 * Math.PI/180;
+lat2 = lat2 * Math.PI/180;
+
+const y = Math.sin(dLon) * Math.cos(lat2);
+const x =
+Math.cos(lat1)*Math.sin(lat2)-
+Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+
+let brng = Math.atan2(y,x);
+
+brng = brng * 180/Math.PI;
+
+return (brng + 360) % 360;
+
+}
+
+/* -----------------------
+SMOOTH BUS MOVEMENT
+----------------------- */
+
+function animateMarker(marker,newLat,newLng){
+
+const start = marker.getLatLng();
+
+const startLat = start.lat;
+const startLng = start.lng;
+
+const steps = 15;
+let i = 0;
+
+const deltaLat = (newLat - startLat) / steps;
+const deltaLng = (newLng - startLng) / steps;
+
+const interval = setInterval(()=>{
+
+i++;
+
+const lat = startLat + deltaLat * i;
+const lng = startLng + deltaLng * i;
+
+marker.setLatLng([lat,lng]);
+
+if(i>=steps){
+clearInterval(interval);
+}
+
+},60);
+
+}
+
+/* -----------------------
+BUS MOVEMENT EVENT
+----------------------- */
 
 socket.on("bus-moved",(location)=>{
 
-console.log("EVENT RECEIVED");
 console.log("Bus moved:", location);
 
 const busName = location.busName;
 
-if(!busMarkers[busName]){
+/* ADD BUS TO DROPDOWN */
 
-/*busMarkers[busName] = L.marker([location.lat, location.lng])
-.addTo(map)
-.bindPopup(busName);*/ 
-busMarkers[busName] = L.marker(
-[location.lat, location.lng],
-{ icon: busIcon }
-)
-.addTo(map)
-.bindPopup(busName);
+const select = document.getElementById("busSelect");
+
+if(!Array.from(select.options).some(o=>o.value===busName)){
+
+const option = document.createElement("option");
+option.value = busName;
+option.text = busName;
+
+select.appendChild(option);
+
 }
 
-busMarkers[busName].setLatLng([location.lat, location.lng]);
+/* CHECK SELECTED BUS */
 
-map.panTo([location.lat, location.lng]);
+const selectedBus = select.value;
 
-const nextStop = getNextStop(location.lat,location.lng);
+if(selectedBus !== "ALL" && selectedBus !== busName){
+return;
+}
+
+const lat = Number(location.lat);
+const lng = Number(location.lng);
+
+let rotation = 0;
+
+if(lastPositions[busName]){
+
+const last = lastPositions[busName];
+
+rotation = getBearing(
+last.lat,
+last.lng,
+lat,
+lng
+);
+
+}
+
+lastPositions[busName] = {lat,lng};
+
+/* BUS ICON */
+
+const busIcon = L.divIcon({
+html:`<img src="/images/bus.png"
+style="width:40px;transform:rotate(${rotation}deg);">`,
+iconSize:[40,40],
+className:""
+});
+
+/* CREATE OR UPDATE MARKER */
+
+if(!busMarkers[busName]){
+
+busMarkers[busName] =
+L.marker([lat,lng],{icon:busIcon})
+.addTo(map)
+.bindPopup(busName);
+
+}
+else{
+
+busMarkers[busName].setIcon(busIcon);
+
+}
+
+/* SMOOTH MOVEMENT */
+
+animateMarker(
+busMarkers[busName],
+lat,
+lng
+);
+
+map.panTo([lat,lng]);
+
+/* NEXT STOP */
+
+const nextStop = getNextStop(lat,lng);
 
 if(nextStop){
+
+let nextIndex = stopsData.findIndex(
+s => s.name === nextStop.name
+);
+
+/* STOP COLOR UPDATE */
+
+stopMarkers.forEach((marker,index)=>{
+
+if(index < nextIndex){
+
+marker.setStyle({color:"green",fillColor:"green"});
+
+}
+else if(index === nextIndex){
+
+marker.setStyle({color:"yellow",fillColor:"yellow"});
+
+}
+else{
+
+marker.setStyle({color:"blue",fillColor:"blue"});
+
+}
+
+});
+
+/* ETA */
 
 document.getElementById("nextStop").innerText = nextStop.name;
 
 const dist = distance(
-location.lat,
-location.lng,
+lat,
+lng,
 nextStop.lat,
 nextStop.lng
 );
 
-const eta = Math.round(dist*500);
+const speed = 30;
+
+let eta = Math.round((dist/speed)*60);
+
+if(eta<1) eta=1;
 
 document.getElementById("eta").innerText = eta+" min";
 
 }
 
 });
+
+/* -----------------------
+SERVICE WORKER
+----------------------- */
 
 if("serviceWorker" in navigator){
 
