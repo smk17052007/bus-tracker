@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#2196f3">
+<title>College Bus Tracker</title>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+
+<style>
+
+body{
+margin:0;
+font-family:Arial;
+}
+
+#map{
+height:100vh;
+}
+
+#panel{
+
+position:absolute;
+bottom:0;
+left:0;
+right:0;
+
+background:white;
+
+padding:15px;
+
+border-top-left-radius:20px;
+border-top-right-radius:20px;
+
+box-shadow:0 -3px 10px rgba(0,0,0,0.3);
+}
+
+.bigText{
+font-size:22px;
+font-weight:bold;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<div id="panel">
+
+<div class="bigText">
+Next Stop: <span id="nextStop">--</span>
+</div>
+
+<div>
+ETA: <span id="eta">--</span>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+
+const map = L.map("map").setView([16.5062,80.6480],14);
+
+L.tileLayer(
+"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+).addTo(map);
+
+const socket = io();
+
+socket.on("connect", () => {
+console.log("Socket connected:", socket.id);
+});
+
+socket.on("disconnect", () => {
+console.log("Socket disconnected");
+});
+
+let stopsData = [];
+let busMarkers = {};
+
+fetch("/stops")
+.then(res=>res.json())
+.then(stops=>{
+
+stopsData = stops;
+
+stops.forEach(stop=>{
+L.marker([stop.lat,stop.lng])
+.addTo(map)
+.bindPopup(stop.name);
+});
+
+});
+
+function distance(lat1,lng1,lat2,lng2){
+
+return Math.sqrt(
+Math.pow(lat1-lat2,2)+
+Math.pow(lng1-lng2,2)
+);
+
+}
+
+function getNextStop(busLat,busLng){
+
+let closest=null;
+let min=Infinity;
+
+stopsData.forEach(stop=>{
+
+const d = distance(busLat,busLng,stop.lat,stop.lng);
+
+if(d<min){
+min=d;
+closest=stop;
+}
+
+});
+
+return closest;
+
+}
+
+/* IMPORTANT: event name must match server */
+
+socket.on("bus-moved",(location)=>{
+
+console.log("EVENT RECEIVED");
+console.log("Bus moved:", location);
+
+const busName = location.busName;
+
+if(!busMarkers[busName]){
+
+busMarkers[busName] = L.marker([location.lat, location.lng])
+.addTo(map)
+.bindPopup(busName);
+
+}
+
+busMarkers[busName].setLatLng([location.lat, location.lng]);
+
+map.panTo([location.lat, location.lng]);
+
+const nextStop = getNextStop(location.lat,location.lng);
+
+if(nextStop){
+
+document.getElementById("nextStop").innerText = nextStop.name;
+
+const dist = distance(
+location.lat,
+location.lng,
+nextStop.lat,
+nextStop.lng
+);
+
+const eta = Math.round(dist*500);
+
+document.getElementById("eta").innerText = eta+" min";
+
+}
+
+});
+
+if("serviceWorker" in navigator){
+
+navigator.serviceWorker
+.register("/sw.js")
+.then(()=>{
+
+console.log("Service Worker Registered");
+
+});
+
+}
+
+</script>
+
+</body>
+</html>

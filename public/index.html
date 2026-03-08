@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>College Bus Tracker</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+
+<style>
+body { margin:0; padding:0; background:#e0e0e0;}
+#map { height:100vh; width:100vw;}
+
+#infoBox{
+position:absolute;
+top:10px;
+left:10px;
+background:white;
+padding:10px;
+border-radius:8px;
+box-shadow:0 2px 5px rgba(0,0,0,0.3);
+z-index:1000;
+font-family:Arial;
+}
+</style>
+</head>
+
+<body>
+
+<div id="infoBox">
+Next Stop: <span id="nextStop">Calculating...</span><br>
+ETA: <span id="eta">--</span>
+</div>
+
+<div id="map"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+
+let stopsData = [];
+
+/* -----------------------------
+   Map Initialization
+------------------------------*/
+
+const map = L.map('map').setView([16.5062,80.6480],14);
+
+/* -----------------------------
+   Admin Mode (Add Stops)
+------------------------------*/
+
+const isAdmin = true;
+
+if(isAdmin){
+
+map.on("click",function(e){
+
+const name = prompt("Enter Stop Name:");
+if(!name) return;
+
+const lat = e.latlng.lat;
+const lng = e.latlng.lng;
+
+fetch("/add-stop",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+name:name,
+lat:lat,
+lng:lng
+})
+})
+.then(res=>res.json())
+.then(data=>{
+
+alert("Stop added successfully!");
+
+L.marker([lat,lng])
+.addTo(map)
+.bindPopup(name)
+.openPopup();
+
+});
+
+});
+
+}
+
+/* -----------------------------
+   Map Tiles
+------------------------------*/
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19,
+attribution:'© OpenStreetMap'
+}).addTo(map);
+
+/* -----------------------------
+   Socket Connection
+------------------------------*/
+
+const socket = io();
+
+socket.on("connect", ()=>{
+console.log("Socket connected:", socket.id);
+});
+
+/* -----------------------------
+   Bus Markers
+------------------------------*/
+
+const markers = {};
+
+function animateMarker(marker, newLat, newLng){
+
+const start = marker.getLatLng();
+
+const startLat = start.lat;
+const startLng = start.lng;
+
+const steps = 20;
+let i = 0;
+
+const deltaLat = (newLat - startLat) / steps;
+const deltaLng = (newLng - startLng) / steps;
+
+const interval = setInterval(()=>{
+
+i++;
+
+const lat = startLat + deltaLat * i;
+const lng = startLng + deltaLng * i;
+
+marker.setLatLng([lat,lng]);
+
+if(i >= steps){
+clearInterval(interval);
+}
+
+},50);
+
+}
+
+/* -----------------------------
+   Load Stops
+------------------------------*/
+
+fetch("/stops")
+.then(res=>res.json())
+.then(stops=>{
+
+stopsData = stops;
+
+const routeCoordinates = [];
+
+stops.forEach(stop=>{
+
+L.marker([stop.lat,stop.lng])
+.addTo(map)
+.bindPopup(stop.name);
+
+routeCoordinates.push([stop.lat,stop.lng]);
+
+});
+
+/* Draw route */
+
+L.polyline(routeCoordinates,{
+color:"blue",
+weight:4
+}).addTo(map);
+
+});
+
+/* -----------------------------
+   Distance Function
+------------------------------*/
+
+function distance(lat1,lng1,lat2,lng2){
+return Math.sqrt(
+Math.pow(lat1-lat2,2)+
+Math.pow(lng1-lng2,2)
+);
+}
+
+/* -----------------------------
+   Find Next Stop
+------------------------------*/
+
+function getNextStop(busLat,busLng){
+
+let closestStop=null;
+let minDistance=Infinity;
+
+stopsData.forEach(stop=>{
+
+const d = distance(busLat,busLng,stop.lat,stop.lng);
+
+if(d<minDistance){
+minDistance=d;
+closestStop=stop;
+}
+
+});
+
+return closestStop;
+
+}
+
+/* -----------------------------
+   Bus Movement Listener
+------------------------------*/
+
+socket.on("bus-moved",(location)=>{
+
+console.log("Bus moved:", location);
+
+const lat = Number(location.lat);
+const lng = Number(location.lng);
+
+if(!markers[location.busName]){
+
+const busIcon = L.icon({
+iconUrl:"https://cdn-icons-png.flaticon.com/512/61/61231.png",
+iconSize:[40,40]
+});
+
+markers[location.busName] = L.marker(
+[lat,lng],
+{icon:busIcon}
+).addTo(map);
+
+}
+
+animateMarker(
+markers[location.busName],
+lat,
+lng
+);
+
+map.panTo([lat,lng]);
+
+const nextStop = getNextStop(lat,lng);
+
+if(nextStop){
+
+document.getElementById("nextStop").innerText = nextStop.name;
+
+const dist = distance(
+lat,
+lng,
+nextStop.lat,
+nextStop.lng
+);
+
+const etaMinutes = Math.round(dist*500);
+
+document.getElementById("eta").innerText = etaMinutes+" min";
+
+}
+
+});
+
+</script>
+
+</body>
+</html>

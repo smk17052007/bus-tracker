@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Driver Bus Tracker</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+
+body{
+font-family:Arial;
+text-align:center;
+padding:40px;
+}
+
+button{
+
+font-size:20px;
+padding:15px 30px;
+background:#2196f3;
+color:white;
+border:none;
+border-radius:8px;
+
+}
+
+#status{
+margin-top:20px;
+font-size:18px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Driver Bus Tracking</h2>
+
+<button onclick="startTracking()">
+START TRACKING
+</button>
+
+<div id="status">
+Waiting...
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+
+const socket = io();
+
+function startTracking(){
+
+if(!navigator.geolocation){
+
+alert("GPS not supported");
+return;
+
+}
+
+document.getElementById("status").innerText =
+"Tracking started...";
+
+navigator.geolocation.watchPosition(position=>{
+
+const lat = position.coords.latitude;
+const lng = position.coords.longitude;
+console.log("GPS:",lat,lng); 
+socket.emit("bus-location",{
+
+busName:"College Bus",
+lat:lat,
+lng:lng
+
+});
+
+});
+
+}
+
+</script>
+
+</body>
+</html>

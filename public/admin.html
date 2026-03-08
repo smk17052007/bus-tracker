@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Bus Admin Panel</title>
+
+<style>
+
+body{
+font-family:Arial;
+padding:20px;
+}
+
+button{
+padding:10px 20px;
+margin:10px;
+font-size:16px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Bus Tracker Admin</h2>
+
+<button onclick="clearStops()">
+Delete All Stops
+</button>
+
+<button onclick="reloadStops()">
+Reload Stops
+</button>
+
+<script>
+
+function clearStops(){
+
+fetch("/clear-stops",{
+method:"POST"
+})
+.then(res=>res.json())
+.then(data=>{
+alert("Stops deleted");
+});
+
+}
+
+function reloadStops(){
+
+location.reload();
+
+}
+
+</script>
+
+</body>
+</html>
