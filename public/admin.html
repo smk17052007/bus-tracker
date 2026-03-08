@@ -108,6 +108,9 @@ loadStops();
 
 var busMarkers = {};
 var stopMarkers = {};
+/* ROUTE LINE */
+
+var routeLine = null;
 /* BUS ICON */
 
 var busIcon = L.icon({
@@ -150,8 +153,10 @@ map.removeLayer(marker);
 });
 
 stopMarkers={};
-
+var routeCoords = [];
 stops.forEach(stop=>{
+
+routeCoords.push([stop.lat, stop.lng]);
 
 const item=document.createElement("div");
 
@@ -172,7 +177,16 @@ const marker = L.marker([stop.lat,stop.lng])
 stopMarkers[stop._id]=marker;
 
 });
+/* draw route */
 
+if(routeLine){
+map.removeLayer(routeLine);
+}
+
+routeLine = L.polyline(routeCoords,{
+color:"blue",
+weight:4
+}).addTo(map);
 });
 
 }
