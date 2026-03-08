@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
-<title>Driver Bus Tracker</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bus Driver GPS</title>
 
 <style>
 
@@ -15,14 +14,8 @@ padding:40px;
 }
 
 button{
-
-font-size:20px;
-padding:15px 30px;
-background:#2196f3;
-color:white;
-border:none;
-border-radius:8px;
-
+padding:12px 20px;
+font-size:16px;
 }
 
 #status{
@@ -36,52 +29,71 @@ font-size:18px;
 
 <body>
 
-<h2>Driver Bus Tracking</h2>
+<h2>Driver GPS Tracker</h2>
 
-<button onclick="startTracking()">
-START TRACKING
-</button>
+<p>Enter Bus Name</p>
 
-<div id="status">
-Waiting...
-</div>
+<input id="busName" placeholder="Bus1">
 
-<script src="/socket.io/socket.io.js"></script>
+<br><br>
+
+<button onclick="startTracking()">Start Tracking</button>
+
+<div id="status">Waiting...</div>
 
 <script>
 
-const socket = io();
+let tracking = false;
 
 function startTracking(){
 
-if(!navigator.geolocation){
+const busName = document.getElementById("busName").value;
 
-alert("GPS not supported");
+if(!busName){
+alert("Enter Bus Name");
 return;
-
 }
 
-document.getElementById("status").innerText =
-"Tracking started...";
+tracking = true;
 
-navigator.geolocation.watchPosition(position=>{
+document.getElementById("status").innerText="Tracking started...";
 
-const lat = position.coords.latitude;
-const lng = position.coords.longitude;
-console.log("GPS:",lat,lng); 
-socket.emit("bus-location",{
+setInterval(()=>{
 
-busName:"College Bus",
+if(!tracking) return;
+
+navigator.geolocation.getCurrentPosition(pos=>{
+
+const lat = pos.coords.latitude;
+const lng = pos.coords.longitude;
+
+fetch("/update-location",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+busName:busName,
 lat:lat,
 lng:lng
+})
 
 });
 
+document.getElementById("status").innerText=
+"Sending location: "+lat.toFixed(5)+", "+lng.toFixed(5);
+
 });
+
+},2000);
 
 }
 
 </script>
 
 </body>
+
 </html>
