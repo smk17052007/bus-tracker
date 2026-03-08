@@ -105,7 +105,27 @@ loadStops();
 var busMarkers = {};
 var stopMarkers = {};
 var routeLine = null;
+/* DISTANCE CALCULATION */
 
+function getDistance(lat1, lon1, lat2, lon2){
+
+const R = 6371;
+
+const dLat = (lat2-lat1) * Math.PI/180;
+const dLon = (lon2-lon1) * Math.PI/180;
+
+const a =
+Math.sin(dLat/2) * Math.sin(dLat/2) +
+Math.cos(lat1*Math.PI/180) *
+Math.cos(lat2*Math.PI/180) *
+Math.sin(dLon/2) *
+Math.sin(dLon/2);
+
+const c = 2 * Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+return R*c;
+
+}
 /* BUS ICON */
 
 var busIcon = L.icon({
@@ -169,7 +189,8 @@ list.appendChild(item);
 
 const marker = L.marker([stop.lat,stop.lng])
 .addTo(map)
-.bindPopup(stop.name);
+.bindPopup(stop.name + "<br>🚌 Calculating ETA...");
+//.bindPopup(stop.name);
 
 stopMarkers[stop._id]=marker;
 
@@ -302,7 +323,45 @@ busMarkers[bus._id]=L.marker([bus.lat,bus.lng],{icon:busIcon})
 busMarkers[bus._id].setLatLng([bus.lat,bus.lng]);
 
 }
+/* UPDATE ETA FOR STOPS */
 
+Object.keys(stopMarkers).forEach(id=>{
+
+const stopMarker = stopMarkers[id];
+
+const stopLatLng = stopMarker.getLatLng();
+
+/* calculate distance */
+
+const distance = getDistance(
+bus.lat,
+bus.lng,
+stopLatLng.lat,
+stopLatLng.lng
+);
+
+/* assume 30 km/h */
+
+const speed = 30;
+
+let eta = Math.round((distance/speed)*60);
+
+/* limit ETA */
+
+if(eta < 1) eta = 1;
+if(eta > 60) eta = ">60";
+
+/* get stop name */
+
+const stopName = stopMarker.getPopup().getContent().split("<br>")[0];
+
+/* update popup */
+
+stopMarker.setPopupContent(
+stopName + "<br>🚌 Bus arriving in " + eta + " min"
+);
+
+});
 });
 
 });
