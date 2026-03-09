@@ -3,7 +3,6 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const mongoose = require('mongoose');
-const fs = require("fs");
 require('dotenv').config();
 const dns = require("dns");
 
@@ -43,40 +42,67 @@ mongoose.connect(process.env.MONGO_URI)
 
 /* -------------------------------
    Driver GPS API (Flutter)
+   FIXED DATABASE SPAM BUG
 --------------------------------*/
 
 app.post('/update-location', async (req, res) => {
 
 try {
 
-console.log("Request body:", req.body);
-
 const { busName, lat, lng } = req.body;
 
-console.log("Location received:", busName, lat, lng);
+if(!busName || lat === undefined || lng === undefined){
+return res.status(400).send("Invalid data");
+}
 
 const latNum = Number(lat);
 const lngNum = Number(lng);
 
-await Bus.findOneAndUpdate(
-{ busName: busName },
-{ lat: latNum, lng: lngNum, lastUpdated: new Date() },
-{ upsert: true }
-);
+const existingBus = await Bus.findOne({ busName });
 
-/* Broadcast location to all maps */
+/* Prevent duplicate updates if movement is tiny */
 
-io.emit("bus-moved", {
-busName: busName,
+if(existingBus){
+
+const distance =
+Math.abs(existingBus.lat - latNum) +
+Math.abs(existingBus.lng - lngNum);
+
+if(distance < 0.00005){
+return res.sendStatus(200);
+}
+
+existingBus.lat = latNum;
+existingBus.lng = lngNum;
+existingBus.lastUpdated = new Date();
+
+await existingBus.save();
+
+}else{
+
+const newBus = new Bus({
+busName,
+lat: latNum,
+lng: lngNum
+});
+
+await newBus.save();
+
+}
+
+/* Broadcast location to dashboard */
+
+io.emit("bus-moved",{
+busName,
 lat: latNum,
 lng: lngNum
 });
 
 res.sendStatus(200);
 
-} catch (err) {
+}catch(err){
 
-console.log("Update location error:", err);
+console.log("Update error:",err);
 res.sendStatus(500);
 
 }
@@ -107,7 +133,6 @@ res.send({ message: "Stop added successfully" });
    Clear Stops
 --------------------------------*/
 
-
 app.post("/clear-stops", async (req,res)=>{
 
 try{
@@ -125,8 +150,9 @@ res.status(500).json({error:err});
 }
 
 });
+
 /* -------------------------------
-   Send Stops to Map
+   Get Stops
 --------------------------------*/
 
 app.get("/stops", async (req, res) => {
@@ -136,17 +162,25 @@ const stops = await Stop.find();
 res.json(stops);
 
 });
+
+/* -------------------------------
+   Delete Stop
+--------------------------------*/
+
 app.delete("/delete-stop/:id", async (req, res) => {
 
-  try {
-    await Stop.findByIdAndDelete(req.params.id);
-    res.send("Stop deleted");
-  } catch (err) {
-    res.status(500).send(err);
-  }
+try {
+await Stop.findByIdAndDelete(req.params.id);
+res.send("Stop deleted");
+} catch (err) {
+res.status(500).send(err);
+}
 
 });
 
+/* -------------------------------
+   Get Buses
+--------------------------------*/
 
 app.get("/buses", async (req,res)=>{
 
@@ -155,25 +189,31 @@ const buses = await Bus.find();
 res.json(buses);
 
 });
+
+/* -------------------------------
+   Delete Bus
+--------------------------------*/
+
 app.delete("/delete-bus/:id", async (req, res) => {
 
-  try {
-    await Bus.findByIdAndDelete(req.params.id);
-    res.send("Bus deleted");
-  } catch (err) {
-    res.status(500).send(err);
-  }
+try {
+await Bus.findByIdAndDelete(req.params.id);
+res.send("Bus deleted");
+} catch (err) {
+res.status(500).send(err);
+}
 
 });
+
 /* -------------------------------
    Socket.IO Connection
 --------------------------------*/
 
 io.on('connection', async (socket) => {
 
-console.log('A user opened the map dashboard!');
+console.log('Map dashboard connected');
 
-/* Send last known bus positions */
+/* Send last known bus locations */
 
 try {
 
@@ -196,7 +236,7 @@ console.log("Error sending last bus location:", err);
 }
 
 socket.on('disconnect', () => {
-console.log('A user closed the map');
+console.log('Dashboard disconnected');
 });
 
 });
@@ -205,6 +245,8 @@ console.log('A user closed the map');
    Start Server
 --------------------------------*/
 
-http.listen(3000, () => {
-console.log('Server running! Open http://localhost:3000 in your browser');
+const PORT = process.env.PORT || 3000;
+
+http.listen(PORT, () => {
+console.log(`Server running on port ${PORT}`);
 });
